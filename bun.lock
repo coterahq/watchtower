@@ -14,7 +14,7 @@
       "name": "@cotera/watchtower-actions",
       "version": "0.1.0",
       "dependencies": {
-        "@cotera/watchtower-models": "workspace:*",
+        "@cotera/watchtower-models": "workspace:^",
       },
       "devDependencies": {
         "@testing-library/react": "^16.3.0",

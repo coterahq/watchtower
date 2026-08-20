@@ -9,7 +9,9 @@
   "scripts": {
     "test": "vitest",
     "test:run": "vitest run",
-    "typecheck": "bun run --filter '*' typecheck"
+    "typecheck": "bun run --filter '*' typecheck",
+    "release:version": "bun scripts/version.mjs",
+    "release:publish": "bun scripts/publish.mjs"
   },
   "devDependencies": {
     "@vitejs/plugin-react": "^5.1.2",
