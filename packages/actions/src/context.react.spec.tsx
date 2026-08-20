@@ -2,7 +2,7 @@ import { render, screen, act } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import { ok } from 'neverthrow';
 import { z } from 'zod';
-import { BaseModel, ModelScope } from '@cotera/watchtower-models';
+import { BaseModel, ModelScopeFactory } from '@cotera/watchtower-models';
 import { ActionsRegistryProvider, useActionsContext } from './context';
 import { BaseAction } from './action.base';
 import { useAction } from './use-action';
@@ -38,14 +38,21 @@ class SaveDocAction extends BaseAction<Record<string, never>> {
  * scope by the model layer has to be visible to an action reading its context.
  */
 describe('actions over a model scope', () => {
-  it('lets an action reach a model registered through ModelScope', async () => {
-    const doc = new Doc('a');
+  it('lets an action reach a model registered through ModelScopeFactory', async () => {
+    const created: Doc[] = [];
 
     render(
       <ActionsRegistryProvider actions={[new SaveDocAction()]}>
-        <ModelScope models={[doc]}>
+        <ModelScopeFactory
+          createModels={() => {
+            const doc = new Doc('a');
+            created.push(doc);
+            return [doc];
+          }}
+          deps={[]}
+        >
           <SaveButton />
-        </ModelScope>
+        </ModelScopeFactory>
       </ActionsRegistryProvider>
     );
 
@@ -53,7 +60,8 @@ describe('actions over a model scope', () => {
       screen.getByText('Save doc').click();
     });
 
-    expect(doc.saved).toBe(true);
+    expect(created).toHaveLength(1);
+    expect(created[0]!.saved).toBe(true);
   });
 
   it('reports an action as inapplicable when its model is not in scope', () => {

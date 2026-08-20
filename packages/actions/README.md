@@ -18,7 +18,7 @@ bun add react zod neverthrow   # peers
 ```
 
 `@cotera/watchtower-models` comes along as a dependency; import `Model`,
-`ModelScope`, and the model hooks from there.
+`ModelScopeFactory`, and the model hooks from there.
 
 ## Actions
 
@@ -113,18 +113,18 @@ const logger = new ConsoleLogger({
 
 `ActionsRegistryProvider` owns both registries: the actions themselves, and the
 `ModelScopeManager` that answers "what is in scope". It publishes that scope to
-[`@cotera/watchtower-models`](../models) internally, so `<ModelScope>` and
-`useInScopeModel` from that package resolve against the very registry the
+[`@cotera/watchtower-models`](../models) internally, so `<ModelScopeFactory>`
+and `useInScopeModel` from that package resolve against the very registry the
 actions read.
 
 ```tsx
 import { ActionsRegistryProvider } from '@cotera/watchtower-actions';
-import { ModelScope } from '@cotera/watchtower-models';
+import { ModelScopeFactory } from '@cotera/watchtower-models';
 
 <ActionsRegistryProvider actions={[new SaveRunAction()]}>
-  <ModelScope models={[runModel]}>
+  <ModelScopeFactory createModels={() => [new RunModel(runKey)]} deps={[runKey]}>
     <RunPage /> {/* SaveRunAction is now applicable */}
-  </ModelScope>
+  </ModelScopeFactory>
 </ActionsRegistryProvider>;
 ```
 
