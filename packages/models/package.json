@@ -1,0 +1,39 @@
+{
+  "name": "@cotera/watchtower-models",
+  "version": "0.1.0",
+  "description": "The WatchTower viewmodel layer: model scopes, lookup by type, and targeting",
+  "type": "module",
+  "license": "MIT",
+  "publishConfig": { "access": "public" },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/coterahq/watchtower.git",
+    "directory": "packages/models"
+  },
+  "homepage": "https://github.com/coterahq/watchtower#readme",
+  "bugs": "https://github.com/coterahq/watchtower/issues",
+  "sideEffects": false,
+  "files": ["src", "!src/**/*.spec.*", "!src/**/*.test.*", "README.md"],
+  "exports": {
+    ".": { "types": "./src/index.ts", "default": "./src/index.ts" },
+    "./package.json": "./package.json"
+  },
+  "main": "./src/index.ts",
+  "module": "./src/index.ts",
+  "types": "./src/index.ts",
+  "scripts": {
+    "test": "vitest",
+    "test:run": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "peerDependencies": {
+    "react": "^18.0.0 || ^19.0.0"
+  },
+  "devDependencies": {
+    "@testing-library/react": "^16.3.0",
+    "@types/react": "^19.1.0",
+    "@types/react-dom": "^19.1.0",
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0"
+  }
+}

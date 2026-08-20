@@ -1,0 +1,20 @@
+{
+  "name": "watchtower-workspace",
+  "private": true,
+  "version": "0.1.0",
+  "description": "WatchTower — observable values, viewmodels, and context-aware actions for React",
+  "type": "module",
+  "license": "MIT",
+  "workspaces": ["packages/*"],
+  "scripts": {
+    "test": "vitest",
+    "test:run": "vitest run",
+    "typecheck": "bun run --filter '*' typecheck"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "^5.1.2",
+    "jsdom": "^27.0.0",
+    "typescript": "^5.9.0",
+    "vitest": "^4.0.18"
+  }
+}
