@@ -1,7 +1,7 @@
 {
   "name": "watchtower",
   "version": "0.1.0",
-  "description": "Teaches Claude to use WatchTower — observable values (watchables), viewmodels (models), and context-aware actions for React. Covers @cotera/watchtower and the -events, -models, -actions, and -query packages.",
+  "description": "Teaches Claude to use WatchTower — observable values (watchables), viewmodels (models), and context-aware actions for React. Covers @cotera/watchtower and the -events, -models, -actions, -query, and -command-palette packages.",
   "author": {
     "name": "Cotera"
   },

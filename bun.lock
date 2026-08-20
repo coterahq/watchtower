@@ -31,6 +31,27 @@
         "zod": "^4.0.0",
       },
     },
+    "packages/command-palette": {
+      "name": "@cotera/watchtower-command-palette",
+      "version": "0.1.0",
+      "dependencies": {
+        "@cotera/watchtower-actions": "workspace:^",
+      },
+      "devDependencies": {
+        "@testing-library/react": "^16.3.0",
+        "@types/react": "^19.1.0",
+        "@types/react-dom": "^19.1.0",
+        "neverthrow": "^8.2.0",
+        "react": "^19.1.0",
+        "react-dom": "^19.1.0",
+        "zod": "^4.1.8",
+      },
+      "peerDependencies": {
+        "neverthrow": "^8.0.0",
+        "react": "^18.0.0 || ^19.0.0",
+        "zod": "^4.0.0",
+      },
+    },
     "packages/events": {
       "name": "@cotera/watchtower-events",
       "version": "0.1.0",
@@ -144,6 +165,8 @@
     "@cotera/watchtower": ["@cotera/watchtower@workspace:packages/watchtower"],
 
     "@cotera/watchtower-actions": ["@cotera/watchtower-actions@workspace:packages/actions"],
+
+    "@cotera/watchtower-command-palette": ["@cotera/watchtower-command-palette@workspace:packages/command-palette"],
 
     "@cotera/watchtower-events": ["@cotera/watchtower-events@workspace:packages/events"],
 

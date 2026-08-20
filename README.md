@@ -39,12 +39,13 @@ A bun workspace, layered so you take only what you need:
 | [`@cotera/watchtower-models`](packages/models)       | Viewmodels: model scopes, lookup by type, targeting                      | react                                            |
 | [`@cotera/watchtower-actions`](packages/actions)     | Actions: applicability, shortcuts, window events, tracking               | `-models`, react, zod, neverthrow                |
 | [`@cotera/watchtower-query`](packages/query)         | TanStack Query bindings for watchables                                   | `watchtower`, `-events`, jotai, @tanstack/react-query |
+| [`@cotera/watchtower-command-palette`](packages/command-palette) | A headless Ctrl-K over the actions and resources in scope    | `-actions`, react                                |
 
 ```
 watchtower ←── watchtower-events ←── watchtower-query
        ↖________________________________/
 
-watchtower-models ←── watchtower-actions
+watchtower-models ←── watchtower-actions ←── watchtower-command-palette
 ```
 
 The two roots are independent of each other: models hold watchables by
@@ -64,6 +65,9 @@ stream should not carry an event bus, and the core has no idea either exists.
   component asks for "the run" rather than being handed one through props.
 - **Actions** — operations that declare when they apply and read the models in
   scope, so the same action serves a command palette, a shortcut, and a button.
+- **Command palette** — the surface that falls out of the other two: Ctrl-K over
+  every action that currently applies and every resource the models in scope
+  offer, headless, so the look stays yours.
 
 ```tsx
 import { Watchable, useWatchableValue } from '@cotera/watchtower';
@@ -78,7 +82,8 @@ function Greeting() {
 
 Each package documents itself: **[watchtower](packages/watchtower)**,
 **[events](packages/events)**, **[models](packages/models)**,
-**[actions](packages/actions)**, **[query](packages/query)**.
+**[actions](packages/actions)**, **[query](packages/query)**,
+**[command-palette](packages/command-palette)**.
 
 ## Using it with Claude
 

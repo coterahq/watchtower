@@ -159,3 +159,16 @@ export const useActionsContext = (): ReadActionsContext => {
   }
   return context;
 };
+
+/**
+ * The actions context if there is one, `null` otherwise.
+ *
+ * For surfaces that may be rendered outside the provider — a modal mounted at
+ * the document root, a portal owned by a dialog library — and are handed a
+ * context explicitly instead. Everything inside the tree should use
+ * {@link useActionsContext}, which fails loudly rather than silently doing
+ * nothing.
+ */
+export const useOptionalActionsContext = (): ReadActionsContext | null => {
+  return useContext(ActionsContext);
+};

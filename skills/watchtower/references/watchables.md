@@ -195,6 +195,59 @@ StalenessWatchable.forValue(
 Reports `'stale'` when any dep's `lastUpdateTime` is newer than the value's —
 "the inputs moved and this has not caught up yet".
 
+## Idioms from a large app
+
+**Watchables live on models, not at module scope.** Module-level state is
+process-wide and never disposed; anything belonging to a screen belongs to the
+model registered for that screen (`references/models.md`). Module scope is for
+values that really are global — a feature flag snapshot, a connection status.
+
+**Components read with the hook, actions read with `snapshot()`.**
+
+```tsx
+const name = useWatchableValue(model.nameWatchable);      // subscribes
+```
+
+```ts
+const name = model.nameWatchable.snapshot();              // one-shot, no render
+```
+
+An action runs outside React and must not subscribe; a component that calls
+`snapshot()` silently stops updating. This is the single most common mix-up.
+
+**`updater` is write-through; `setFromSource` is the way back in.** A watchable
+that mirrors something outside the app — a URL query parameter, a storage key —
+writes on `set` through its updater, and takes external changes through
+`setFromSource` so the write does not echo back:
+
+```ts
+const tab = Watchable.fromValue(initialTab, {
+  equalityFn: (a, b) => a === b,
+  updater: (value) => {
+    urlAdapter.setParam('tab', serialize(value));   // set() → URL
+    return value;
+  },
+});
+
+// browser back/forward → watchable, without re-writing the URL
+tab.setFromSource(parse(params.get('tab')));
+```
+
+**`equalityFn` is not an optimisation, it is the default you usually want.**
+`Watchable.fromValue` never dedupes unless told to, so a value re-set on every
+frame re-renders every subscriber. Two shapes recur: `(a, b) => a === b` for
+scalars, and a structural compare for objects rebuilt from an API response.
+
+**A side-effect watchable declares `equalityFn: () => true`.** Some watchables
+exist only for what their `fn` does — invalidating a query cache, say — and have
+no value worth publishing. Always-equal means no subscriber is ever notified.
+
+**Shared live values come from one factory, not from each model.** An app with a
+push stream tends to grow a single object that mints and refcounts its
+`EventWatchable`s, injected into models as a constructor prop, with
+`unsubscribe()` in `dispose()`. It keeps two screens watching the same resource
+from opening two subscriptions. See `references/events.md`.
+
 ## What lives elsewhere
 
 - `EventWatchable`, `TwoWayEventWatchable`, the event bus → `@cotera/watchtower-events`

@@ -131,6 +131,48 @@ inside `persist` if you need the detail.
 Every `EventWatchable` option applies. The returned type has `setOptimistic`,
 `refresh`, `unsubscribe`, and the readonly surface — but no plain `set`.
 
+## One factory, not one per model
+
+Live values are shared — two screens watching the same resource should share one
+subscription — and every one of them needs releasing. Both fall out of putting
+construction in a single object that the models take as a prop:
+
+```ts
+class WatchablesFactory {
+  makeResourceUpdatedWatchable<T>(opts): ReadonlyEventWatchable<T> {
+    return this.makeEventWatchable({ ...opts, event: 'resource.updated' });
+  }
+}
+
+// in a model
+constructor({ watchablesFactory }: Props) {
+  this.graphEventWatchable = watchablesFactory.makeResourceUpdatedWatchable({
+    initialValue: null,
+    debounceMs: 500,
+    serializeRefreshes: true,
+    serializeQueueStrategy: 'discard',
+    filter: (payload) => payload.resourceId === this.workflowId,
+    fn: async () => fetchGraph(this.workflowId),
+  });
+}
+
+dispose() {
+  this.graphEventWatchable.unsubscribe();
+}
+```
+
+Named methods per event type keep the event strings in one file, and refcounting
+inside the factory lets a second model reuse a live watchable instead of opening
+a second subscription — with a matching `release…` method when it does.
+
+The combination above is the common one for a resource kept live by a stream:
+debounce a burst of broadcasts, serialize so refreshes cannot overlap, discard
+queued duplicates because the next fetch would see the same state anyway, and
+filter to the one resource this model is about. Pair it with
+`reconcile: { cadence }` when the view can mount mid-burst and miss the early
+events, and with `equalityFn` so a re-fetch that changed nothing does not
+re-render.
+
 ## Choosing between this and polling
 
 `PollingWatchable` when the server has no way to tell you. `EventWatchable` with

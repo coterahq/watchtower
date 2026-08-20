@@ -1,6 +1,6 @@
 ---
 name: watchtower
-description: Build React state with WatchTower — observable values (watchables), viewmodels (models), and context-aware actions. Use when working with @cotera/watchtower, @cotera/watchtower-events, @cotera/watchtower-models, @cotera/watchtower-actions, or @cotera/watchtower-query, or with Watchable, useWatchableValue, ReadonlyWatchable, EventWatchable, PollingWatchable, MixedSourceWatchable, WatchableRecord, QueryWatchable, ModelScopeFactory, ModelScopeManager, useInScopeModel, BaseAction, or ActionsRegistryProvider.
+description: Build React state with WatchTower — observable values (watchables), viewmodels (models), context-aware actions, and the command palette over them. Use when working with @cotera/watchtower, @cotera/watchtower-events, @cotera/watchtower-models, @cotera/watchtower-actions, @cotera/watchtower-query, or @cotera/watchtower-command-palette, or with Watchable, useWatchableValue, ReadonlyWatchable, EventWatchable, PollingWatchable, MixedSourceWatchable, WatchableRecord, QueryWatchable, ModelScopeFactory, ModelScopeManager, useInScopeModel, BaseAction, ActionsRegistryProvider, or useCommandPalette.
 version: 0.1.0
 ---
 
@@ -18,6 +18,8 @@ watchtower ←── watchtower-events ←── watchtower-query     (values)
        ↖________________________________/
 
 watchtower-models ←── watchtower-actions                  (structure)
+                              ↑
+                   watchtower-command-palette             (a surface over both)
 ```
 
 Neither half depends on the other. Models hold watchables by convention, not by
@@ -39,6 +41,7 @@ to use watchables, or the reverse.
 | An event that should bust TanStack cache prefixes | `QueryClientEventWatchable.for` | `@cotera/watchtower-query` |
 | "The run this part of the screen is about" | a model + `ModelScopeFactory` | `@cotera/watchtower-models` |
 | One operation serving palette + shortcut + button | `BaseAction` subclass | `@cotera/watchtower-actions` |
+| Ctrl-K over what applies right now | `useCommandPalette` | `@cotera/watchtower-command-palette` |
 
 If the answer is "plain derived state and nothing else", stop at
 `@cotera/watchtower`. Every package past it exists to handle a failure mode; do
@@ -77,6 +80,73 @@ or inside it to "add models"** — that creates a second registry, and an action
 asking what is in scope will not see models registered into the other one. Using
 models *without* actions is the only case where you mount `ModelScopeProvider`
 yourself.
+
+## The shape this takes in a real app
+
+From the client it was extracted from — ~140 action classes, ~50 models, ~470
+`useWatchableValue` call sites. Reach for the same shape by default; the
+per-layer references have the detail.
+
+**Interaction is an action, not a handler.** Anything a user does that is not
+purely local to one component gets a `BaseAction` subclass in a
+`something.action.ts` beside the feature. The component keeps the markup:
+
+```tsx
+const { execute } = useAction(SaveWorkflowAction);
+<Button onClick={() => void execute()} />
+```
+
+That is worth doing because of what comes free with the declaration: the command
+palette lists it, `shortcut` binds it, `applicable(context)` decides whether the
+toolbar button renders at all, the tracking adapter sees every run, and `scopes:
+['chat']` hands the same operation to an agent. A plain `onClick` gets none of
+it. Keep the *component's own* state in the component; a disclosure toggle is not
+an action.
+
+**State lives on models, as watchables.** A page's model holds private
+`Watchable`s and exposes `ReadonlyWatchable`s; components read them with
+`useWatchableValue`, actions read them with `snapshot()`. Module-level watchables
+are for genuinely process-wide values only.
+
+**Two tiers of registration.** App-wide actions and models at the root; a page
+mounts its own inside its route, so they disappear on unmount:
+
+```tsx
+<Actions actions={pageActions}>                    {/* -actions */}
+  <ModelScopeFactory createModels={createModels} deps={deps} key={id}>
+    <PageContent />
+  </ModelScopeFactory>
+</Actions>
+```
+
+**Actions take their collaborators through the constructor** — the API client,
+the modal manager, the query client, the org id — and are instantiated once in a
+`useMemo` where those are in scope. They read *models* from the context passed to
+`applicable` and `execute`, never from React.
+
+**One helper per model lookup, not a lookup per action.** A feature exports
+`workflowModelFromContext(context)` / `targetedTriggerNode(context)` and its
+actions call that. A family of actions that share a payload shape and an
+applicability rule gets a small abstract base class extending `BaseAction`.
+
+**Null-rendering sync components bridge React into models.** Route params, query
+results and feature flags reach a model through a component that renders `null`
+and pushes them in an effect — that is also where `targetModel` is called:
+
+```tsx
+const Sync: React.FC<{ name: string }> = ({ name }) => {
+  const selection = useInScopeModel(ResourceSelectionModel);
+  const context = useActionsContext();
+  useEffect(() => {
+    selection.setName(name);
+    context.targetModel(selection);
+  }, [selection, name, context]);
+  return null;
+};
+```
+
+**Then Ctrl-K is free.** `useCommandPalette` reads the same two registries — see
+`references/command-palette.md`.
 
 ## Rules that the types do not enforce
 
@@ -139,6 +209,7 @@ surface and the failure modes specific to it.
 | `references/models.md` | models, scopes, lookup by type, targeting |
 | `references/actions.md` | `BaseAction`, applicability, `ask`, shortcuts, window events, tracking, logging |
 | `references/query.md` | `QueryWatchable`, `QueryClientEventWatchable`, prefix invalidation |
+| `references/command-palette.md` | `useCommandPalette`, entries and sections, ranking, triggers |
 | `references/testing.md` | resetting the bus, headless scopes, Strict Mode, fake timers |
 
 ## Style to match

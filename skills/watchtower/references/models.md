@@ -178,6 +178,71 @@ Targeting is exclusive per type: `targetModel` clears the flag on every sibling
 of that type first. Manager-level API: `targetModel`, `targetedModelOfType`,
 `hasTargetedModelOfType`, `markAsNotTargeted`, `removeTargetForType`.
 
+## Models in practice
+
+**Private `Watchable`, public `ReadonlyWatchable`.** The dominant shape: the
+model owns the writes, everything else gets a read-only view, and derived values
+are computed in the model rather than in each component.
+
+```ts
+export class WorkflowModel extends BaseModel implements TargetableModel {
+  readonly nameWatchable: ReadonlyWatchable<string>;
+  readonly hasUnsavedChangesWatchable: ReadonlyWatchable<boolean>;
+
+  private readonly _draftWatchable: Watchable<WorkflowDraft>;
+  private readonly _baselineWatchable: Watchable<WorkflowDraft>;
+
+  constructor({ workflowId, client, watchablesFactory }: WorkflowModelProps) {
+    super(`workflow-${workflowId}`);
+    this._draftWatchable = Watchable.fromValue(emptyDraft());
+    this._baselineWatchable = Watchable.fromValue(emptyDraft());
+    this.hasUnsavedChangesWatchable = Watchable.from(
+      (get) => isDirty(get(this._draftWatchable), get(this._baselineWatchable))
+    );
+    …
+  }
+}
+```
+
+**Collaborators arrive as constructor props.** The API client, a query client,
+the shared watchables factory, a URL adapter — the same injection actions use.
+Keep the prop types narrow (`Pick<TenantedClient, 'resource'>`): it is what makes
+the model testable without a network.
+
+**`dispose()` releases subscriptions.** Anything with a timer or an event
+subscription — an `EventWatchable`, a `PollingWatchable`, a child model — is
+unsubscribed there. Nothing else runs when the last registrant leaves.
+
+**A hook per model, next to the class.** Components import that rather than
+repeating the lookup:
+
+```ts
+export const useAppModel = () => useInScopeModel(AppModel);
+```
+
+**Several models per scope, not one big one.** A page registers its main model
+alongside small satellites — a selection model, an artifact model — from one
+`createModels`, and passes watchables between them at construction:
+
+```tsx
+createModels={() => {
+  const chat = new ChatModel({ conversationId, client });
+  return [chat, new SelectionModel(), new QueueModel(chat.messagesWatchable)];
+}}
+deps={[conversationId]}
+```
+
+`key={conversationId}` on the factory forces a fresh scope when the identity of
+the thing on screen changes, rather than mutating models in place.
+
+**`resources()` is what a global search shows.** The app-shell model maps what it
+already holds — recent chats, agents, documents, folders — into `ModelResource`s,
+and `@cotera/watchtower-command-palette` picks them up with no further wiring.
+
+**Sync components push React data in.** Route params, query results and feature
+flags reach a model through a `null`-rendering component that sets them in an
+effect and calls `targetModel`. Models never call React hooks.
+
 ## Developer details
 
 An optional `developerDetails(): { title, entries: {key, value}[] }` on a model

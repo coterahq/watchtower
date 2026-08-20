@@ -118,7 +118,9 @@ throws only if the action is not registered. `action` exposes live getters for
 `getAllActions()`, the scope queries, `dispatchEvent`, `subscribe`.
 
 A command palette filters with `applicable(context)` and orders by
-`getPriority?.(context) ?? priority`.
+`getPriority?.(context) ?? priority` — which is exactly what
+`@cotera/watchtower-command-palette` does, so do not write that loop by hand
+(`references/command-palette.md`).
 
 ## Asking for input
 
@@ -171,6 +173,95 @@ Both shortcuts and window events evaluate `applicable()` against a **fresh
 manager** built by `ActionsManager.fromExisting(context)`, holding the same
 actions and a copy of the current models. That is what makes an action see the
 scope as it is at keypress time rather than at render time.
+
+## How they get used
+
+The patterns below are what ~140 actions in one large client converged on. None
+are enforced by the types; all of them are worth copying.
+
+**Collaborators come through the constructor, models through the context.**
+
+```tsx
+const actions = useMemo(
+  () => [
+    new RenameDatasetAction(client, modalManager, orgId),
+    new SaveWorkflowAction(client, queryClient),
+  ],
+  [client, modalManager, orgId, queryClient]
+);
+```
+
+An action is a long-lived object, not a hook, so anything React-shaped — the API
+client, the modal manager, a router — is injected once where it is in scope. What
+the action operates *on* is different: that is read from `ApplicableContext` /
+`ExecuteContext` at call time, because it changes with the screen.
+
+**A helper per lookup, not a lookup per action.** Each feature exports the
+readers its actions share, so `getInScopeModelOfType` appears once:
+
+```ts
+export function workflowModelFromContext(context: ApplicableContext) {
+  return context.getInScopeModelOfType(WorkflowModel);
+}
+```
+
+Actions that name a *targeted* model use `targetedModelOfType`, and return null —
+"cannot act" — rather than falling back to an unnarrowed call. A helper returning
+null is the honest answer when the user's subject is ambiguous.
+
+**A base class per family.** Actions sharing a payload shape and an applicability
+rule get a small abstract class over `BaseAction`, which is also where the empty
+schema lives:
+
+```ts
+export abstract class WorkflowToolbarActionBase<
+  Errors extends { t: string }[] = { t: string }[]
+> extends BaseAction<Record<string, never>, Errors> {
+  inputSchema = z.object({});
+  abstract override applicable(context: ApplicableContext): boolean;
+}
+```
+
+**Two tiers of registration.** App-wide actions on `ActionsRegistryProvider` at
+the root; page actions on `<Actions>` inside the route, wrapped around the
+`ModelScopeFactory` that registers what they act on. Both disappear together on
+unmount.
+
+**`applicable` drives rendering, not just the palette.** A toolbar asks the
+registry rather than the props:
+
+```tsx
+const registered = context.getAction(actionConstructor);
+if (registered === undefined || registered.applicable(context) === false) {
+  return null;                       // no button for something that cannot run
+}
+```
+
+That is the payoff of declaring applicability once: the palette, the shortcut and
+the button agree by construction.
+
+**`getPriority` for "the thing on screen".** Static `priority` is rare; the
+common shape is a context-dependent bump so an action about the targeted model
+sorts above the generic ones:
+
+```ts
+getPriority(context: ApplicableContext): number {
+  return this.targetDatasetId(context) !== null ? 20 : 0;
+}
+```
+
+**`shouldAsk(): true` plus `ask` is the normal dialog.** Most actions that ask do
+not derive it from the schema — they declare `shouldAsk` and render a modal from
+`ask`, then `execute` with what came back. Define the pair together; `shouldAsk`
+without `ask` throws.
+
+**Window events are the escape hatch, not the norm.** `useAction` covers almost
+everything; `events` is for code with no view in reach — a URL handler, a
+non-React module.
+
+**Sync components push React data in.** Route params and query results reach a
+model through a `null`-rendering component that also calls
+`context.targetModel(model)` in its effect.
 
 ## Tracking and logging
 
