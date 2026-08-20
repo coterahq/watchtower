@@ -1,0 +1,114 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Run every check and pack the tarballs, but publish nothing"
+        type: boolean
+        default: true
+      dist_tag:
+        description: "npm dist-tag to publish under (ignored when dry_run is on)"
+        type: string
+        default: "latest"
+
+permissions:
+  contents: read
+  # npm provenance signs the release with a short-lived OIDC identity, proving
+  # the tarballs were built by this workflow from this commit.
+  id-token: write
+
+# Never let two releases upload at the same time, and never cancel one midway
+# through — a half-published release has to be re-run to finish.
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    name: Publish to npm
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: "1.2.19"
+
+      # bun packs the tarballs, npm uploads them (see scripts/publish.mjs).
+      # `registry-url` is what makes npm read NODE_AUTH_TOKEN.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          registry-url: "https://registry.npmjs.org"
+
+      - name: Install
+        run: bun install --frozen-lockfile
+
+      - name: Resolve release
+        id: release
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          TAG_NAME: ${{ github.ref_name }}
+          INPUT_DIST_TAG: ${{ inputs.dist_tag }}
+          INPUT_DRY_RUN: ${{ inputs.dry_run }}
+        run: |
+          set -euo pipefail
+          if [ "$EVENT_NAME" = "push" ]; then
+            version="${TAG_NAME#v}"
+            dry_run="false"
+            # A prerelease tag (v1.0.0-rc.1) must not become the "latest" that
+            # a bare `npm install` resolves to.
+            case "$version" in
+              *-*) dist_tag="next" ;;
+              *)   dist_tag="latest" ;;
+            esac
+          else
+            version="$(bun --print 'require("./package.json").version')"
+            dry_run="$INPUT_DRY_RUN"
+            dist_tag="$INPUT_DIST_TAG"
+          fi
+
+          case "$version" in
+            [0-9]*.[0-9]*.[0-9]*) ;;
+            *) echo "::error::'$version' is not a semver version (expected a tag like v1.2.3)"; exit 1 ;;
+          esac
+
+          {
+            echo "version=$version"
+            echo "dist_tag=$dist_tag"
+            echo "dry_run=$dry_run"
+          } >> "$GITHUB_OUTPUT"
+
+          echo "Releasing $version under dist-tag '$dist_tag' (dry run: $dry_run)"
+
+      - name: Check every package is at ${{ steps.release.outputs.version }}
+        run: bun scripts/version.mjs --check "${{ steps.release.outputs.version }}"
+
+      - name: Typecheck
+        run: bun run typecheck
+
+      - name: Test
+        run: bun run test:run
+
+      - name: Publish
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          DIST_TAG: ${{ steps.release.outputs.dist_tag }}
+          DRY_RUN: ${{ steps.release.outputs.dry_run }}
+        run: |
+          set -euo pipefail
+          if [ -z "${NODE_AUTH_TOKEN:-}" ]; then
+            echo "::error::The NPM_TOKEN repository secret is not set."
+            exit 1
+          fi
+          if [ "$DRY_RUN" = "true" ]; then
+            bun scripts/publish.mjs --tag="$DIST_TAG" --dry-run
+          else
+            bun scripts/publish.mjs --tag="$DIST_TAG" --provenance
+          fi

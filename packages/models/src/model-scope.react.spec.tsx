@@ -2,7 +2,7 @@ import { render, screen, act } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import { useState } from 'react';
 import { ModelScopeProvider, useModelScope } from './model-scope.context';
-import { ModelScope } from './model-scope';
+import { ModelScopeFactory } from './model-scope';
 import { BaseModel } from './model.base';
 import {
   useInScopeModel,
@@ -21,13 +21,11 @@ class Doc extends BaseModel {
  */
 describe('models without actions', () => {
   it('finds a registered model by type', () => {
-    const doc = new Doc('a', 'Hello');
-
     render(
       <ModelScopeProvider>
-        <ModelScope models={[doc]}>
+        <ModelScopeFactory createModels={() => [new Doc('a', 'Hello')]} deps={[]}>
           <Title />
-        </ModelScope>
+        </ModelScopeFactory>
       </ModelScopeProvider>
     );
 
@@ -40,7 +38,12 @@ describe('models without actions', () => {
       return (
         <ModelScopeProvider>
           <MaybeTitle />
-          {mounted && <ModelScope models={[new Doc('a', 'Arrived')]} />}
+          {mounted && (
+            <ModelScopeFactory
+              createModels={() => [new Doc('a', 'Arrived')]}
+              deps={[]}
+            />
+          )}
           <button onClick={() => setMounted(true)}>mount</button>
         </ModelScopeProvider>
       );
@@ -67,7 +70,12 @@ describe('models without actions', () => {
       return (
         <ModelScopeProvider>
           <Capture />
-          {show && <ModelScope models={[new Doc('a', 'Hello')]} />}
+          {show && (
+            <ModelScopeFactory
+              createModels={() => [new Doc('a', 'Hello')]}
+              deps={[]}
+            />
+          )}
         </ModelScopeProvider>
       );
     }
@@ -80,19 +88,117 @@ describe('models without actions', () => {
   });
 
   it('resolves from an enclosing scope when the nearest one has no match', () => {
-    const outer = new Doc('outer', 'From outer');
-
     render(
       <ModelScopeProvider>
-        <ModelScope models={[outer]}>
+        <ModelScopeFactory
+          createModels={() => [new Doc('outer', 'From outer')]}
+          deps={[]}
+        >
           <ModelScopeProvider>
             <Title />
           </ModelScopeProvider>
-        </ModelScope>
+        </ModelScopeFactory>
       </ModelScopeProvider>
     );
 
     expect(screen.getByText('From outer')).toBeDefined();
+  });
+});
+
+/**
+ * These pin down why `ModelScopeFactory` is the only scope component. The
+ * removed `<ModelScope models={[...]}>` took a fresh array literal on every
+ * render, so it disposed and re-registered its models on every parent render,
+ * and — holding instances built outside the effect — re-registered already
+ * disposed ones after a remount.
+ */
+describe('registration lifecycle', () => {
+  class Tracked extends BaseModel {
+    static log: string[] = [];
+    onCreate() {
+      Tracked.log.push(`create:${this.id}`);
+    }
+    dispose() {
+      Tracked.log.push(`dispose:${this.id}`);
+    }
+  }
+
+  it('does not re-register when the parent re-renders', () => {
+    Tracked.log = [];
+    let rerenderParent: () => void = () => {};
+
+    function Harness() {
+      const [, setTick] = useState(0);
+      rerenderParent = () => setTick((n) => n + 1);
+      return (
+        <ModelScopeFactory createModels={() => [new Tracked('a')]} deps={[]}>
+          <div />
+        </ModelScopeFactory>
+      );
+    }
+
+    render(
+      <ModelScopeProvider>
+        <Harness />
+      </ModelScopeProvider>
+    );
+    expect(Tracked.log).toEqual(['create:a']);
+
+    act(() => rerenderParent());
+    act(() => rerenderParent());
+
+    expect(Tracked.log).toEqual(['create:a']);
+  });
+
+  it('builds a fresh model on remount rather than reviving a disposed one', () => {
+    Tracked.log = [];
+    const seen: Tracked[] = [];
+
+    function Harness({ show }: { show: boolean }) {
+      return (
+        <ModelScopeProvider>
+          {show && (
+            <ModelScopeFactory
+              createModels={() => {
+                const model = new Tracked('z');
+                seen.push(model);
+                return [model];
+              }}
+              deps={[]}
+            />
+          )}
+        </ModelScopeProvider>
+      );
+    }
+
+    const { rerender } = render(<Harness show={true} />);
+    rerender(<Harness show={false} />);
+    rerender(<Harness show={true} />);
+
+    expect(Tracked.log).toEqual(['create:z', 'dispose:z', 'create:z']);
+    // The revived registration is a *new* instance, not the disposed one.
+    expect(seen).toHaveLength(2);
+    expect(seen[0]).not.toBe(seen[1]);
+  });
+
+  it('re-registers when deps change', () => {
+    Tracked.log = [];
+
+    function Harness({ id }: { id: string }) {
+      return (
+        <ModelScopeProvider>
+          <ModelScopeFactory
+            createModels={() => [new Tracked(id)]}
+            deps={[id]}
+          />
+        </ModelScopeProvider>
+      );
+    }
+
+    const { rerender } = render(<Harness id="a" />);
+    rerender(<Harness id="b" />);
+
+    expect(Tracked.log).toEqual(['create:a', 'dispose:a', 'create:b']);
   });
 });
 

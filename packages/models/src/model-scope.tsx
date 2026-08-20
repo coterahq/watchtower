@@ -1,54 +1,6 @@
-import React, { useEffect, useMemo, useState, type ReactNode } from 'react';
+import React, { useEffect, useState, type ReactNode } from 'react';
 import { useModelScope } from './model-scope.context';
 import type { Model, ModelConstructor } from './types';
-
-function useRegisterModels<T extends Model>(
-  create: () => T[],
-  opts: {
-    register: boolean;
-    deps: any[];
-  }
-) {
-  const scope = useModelScope();
-
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  const memodModels = useMemo(create, opts.deps);
-  const [ready, setReady] = useState(false);
-
-  useEffect(() => {
-    if (opts.register) {
-      scope.addModels(memodModels);
-      memodModels.forEach((model) => {
-        model.onCreate?.();
-      });
-    } else {
-      // Remove any existing models that are no longer registered
-      memodModels.forEach((model) => {
-        if (
-          scope.getModelOfType(
-            model.constructor as ModelConstructor,
-            model.id
-          ) &&
-          !opts.register
-        ) {
-          scope.removeModel(model.constructor as ModelConstructor, model.id);
-        }
-      });
-    }
-
-    setReady(true);
-
-    return () => {
-      // Cleanup by removing all models (removeModel calls dispose when ref count reaches 0)
-      memodModels.forEach((model) => {
-        scope.removeModel(model.constructor as ModelConstructor, model.id);
-      });
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [memodModels, opts.register]);
-
-  return ready;
-}
 
 /**
  * Registers models created by a factory inside the effect. When the effect runs
@@ -88,25 +40,6 @@ function useRegisterModelsFromFactory<T extends Model>(
   return ready;
 }
 
-type ModelScopeProps = {
-  models: Model[];
-  children?: ReactNode;
-};
-
-/** Registers `models` into the surrounding scope for as long as this is mounted. */
-export function ModelScope({ models, children }: ModelScopeProps) {
-  const ready = useRegisterModels(() => models, {
-    register: true,
-    deps: [models],
-  });
-
-  if (!ready) {
-    return null;
-  }
-
-  return <>{children}</>;
-}
-
 type ModelScopeFactoryProps = {
   createModels: () => Model[];
   deps: React.DependencyList;
@@ -114,10 +47,21 @@ type ModelScopeFactoryProps = {
 };
 
 /**
- * Registers models created by a factory inside the effect. When the effect runs
- * (including on remount), fresh models are created. When cleanup runs, we dispose
- * those models. This avoids the "zombie model" problem where a disposed model
- * gets re-added to context after unmount/remount (e.g. React Strict Mode).
+ * Registers the models a factory creates for as long as this is mounted.
+ *
+ * The factory runs *inside* the effect, and `deps` — not the identity of the
+ * models themselves — decides when it re-runs. That is what makes this the only
+ * scope component: a `models={[model]}` prop would take a fresh array on every
+ * render and re-register on every render, and holding instances created outside
+ * the effect means a remount re-registers models that were already disposed.
+ *
+ * Pass the values the models are built from as `deps`, the same as `useMemo`:
+ *
+ * ```tsx
+ * <ModelScopeFactory createModels={() => [new RunModel(runKey)]} deps={[runKey]}>
+ *   <RunTitle />
+ * </ModelScopeFactory>
+ * ```
  */
 export function ModelScopeFactory({
   createModels,

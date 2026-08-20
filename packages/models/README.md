@@ -26,7 +26,7 @@ owns the registry they go into — see [Scopes](#scopes).
 
 ```tsx
 import {
-  ModelScope,
+  ModelScopeFactory,
   useInScopeModel,
   type TargetableModel,
 } from '@cotera/watchtower-models';
@@ -50,13 +50,12 @@ class RunModel implements TargetableModel {
 }
 
 function RunPage({ runKey }: { runKey: string }) {
-  const model = useMemo(() => new RunModel(runKey), [runKey]);
-
-  // registers `model` for as long as this page is mounted
+  // builds the model inside the effect and registers it for as long as this
+  // page is mounted; `deps` decides when it is rebuilt, the same as `useMemo`
   return (
-    <ModelScope models={[model]}>
+    <ModelScopeFactory createModels={() => [new RunModel(runKey)]} deps={[runKey]}>
       <RunTitle />
-    </ModelScope>
+    </ModelScopeFactory>
   );
 }
 
@@ -71,9 +70,12 @@ _type_ and gets the nearest one. Registration is refcounted, so two sibling
 subtrees registering the same model do not tear it down for each other when the
 first unmounts. `dispose()` runs when the last registrant leaves.
 
-`ModelScopeFactory` takes a factory instead of instances, creating fresh models
-inside the effect. Prefer it when models must not survive a remount — React
-Strict Mode otherwise leaves a disposed model registered.
+`ModelScopeFactory` takes a factory rather than instances on purpose. Running it
+inside the effect, keyed on `deps`, is what keeps registration stable: a
+`models={[model]}` prop would be a fresh array on every render and re-register on
+every render, and instances built outside the effect get re-registered after a
+remount even though unmounting already disposed them — the "zombie model" React
+Strict Mode surfaces.
 
 **Targeting** answers "which one did the user mean" when several models of a
 type coexist. `createProvidedModelContext` hands descendants a specific instance
