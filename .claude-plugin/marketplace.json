@@ -1,0 +1,20 @@
+{
+  "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
+  "name": "watchtower",
+  "description": "The WatchTower plugin: skills that teach Claude how to build with @cotera/watchtower",
+  "owner": {
+    "name": "Cotera",
+    "url": "https://github.com/coterahq"
+  },
+  "plugins": [
+    {
+      "name": "watchtower",
+      "description": "Teaches Claude to use WatchTower — observable values (watchables), viewmodels (models), and context-aware actions for React.",
+      "source": "./",
+      "category": "development",
+      "author": { "name": "Cotera" },
+      "homepage": "https://github.com/coterahq/watchtower#readme",
+      "license": "MIT"
+    }
+  ]
+}

@@ -1,0 +1,12 @@
+{
+  "name": "watchtower",
+  "version": "0.1.0",
+  "description": "Teaches Claude to use WatchTower — observable values (watchables), viewmodels (models), and context-aware actions for React. Covers @cotera/watchtower and the -events, -models, -actions, and -query packages.",
+  "author": {
+    "name": "Cotera"
+  },
+  "homepage": "https://github.com/coterahq/watchtower#readme",
+  "repository": "https://github.com/coterahq/watchtower",
+  "license": "MIT",
+  "keywords": ["react", "state-management", "jotai", "watchtower", "viewmodel"]
+}

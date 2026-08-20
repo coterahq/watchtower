@@ -80,6 +80,22 @@ Each package documents itself: **[watchtower](packages/watchtower)**,
 **[events](packages/events)**, **[models](packages/models)**,
 **[actions](packages/actions)**, **[query](packages/query)**.
 
+## Using it with Claude
+
+The repo ships a [Claude Code](https://claude.com/claude-code) skill that teaches
+an agent the API surface and the failure modes it is built around, so it reaches
+for the right layer instead of reinventing one:
+
+```
+/plugin marketplace add coterahq/watchtower
+/plugin install watchtower
+```
+
+The skill loads on demand — when a task actually touches a `@cotera/watchtower*`
+package — and routes to a reference file per layer. Contributors working in this
+repo get it automatically through `.claude/skills`. Source lives in
+[`skills/watchtower`](skills/watchtower).
+
 ## Development
 
 ```bash
