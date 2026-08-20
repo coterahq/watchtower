@@ -17,8 +17,9 @@ on:
 
 permissions:
   contents: read
-  # npm provenance signs the release with a short-lived OIDC identity, proving
-  # the tarballs were built by this workflow from this commit.
+  # The OIDC identity is what npm authenticates as (trusted publishing, no
+  # token) and what signs provenance, proving the tarballs were built by this
+  # workflow from this commit.
   id-token: write
 
 # Never let two releases upload at the same time, and never cancel one midway
@@ -41,11 +42,20 @@ jobs:
           bun-version: "1.2.19"
 
       # bun packs the tarballs, npm uploads them (see scripts/publish.mjs).
-      # `registry-url` is what makes npm read NODE_AUTH_TOKEN.
+      # No NPM_TOKEN: npm authenticates via the OIDC identity minted below
+      # (trusted publishing), which is why `id-token: write` is required.
+      # `registry-url` points npm at the registry the OIDC exchange runs against.
       - uses: actions/setup-node@v4
         with:
-          node-version: "22"
+          node-version: "24"
           registry-url: "https://registry.npmjs.org"
+
+      # Trusted publishing needs npm >= 11.5.1. Node 24 already ships npm 11,
+      # but pin it so a runner image change can never silently drop below that.
+      - name: Ensure npm supports trusted publishing
+        run: |
+          npm install -g npm@latest
+          npm --version
 
       - name: Install
         run: bun install --frozen-lockfile
@@ -98,15 +108,10 @@ jobs:
 
       - name: Publish
         env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
           DIST_TAG: ${{ steps.release.outputs.dist_tag }}
           DRY_RUN: ${{ steps.release.outputs.dry_run }}
         run: |
           set -euo pipefail
-          if [ -z "${NODE_AUTH_TOKEN:-}" ]; then
-            echo "::error::The NPM_TOKEN repository secret is not set."
-            exit 1
-          fi
           if [ "$DRY_RUN" = "true" ]; then
             bun scripts/publish.mjs --tag="$DIST_TAG" --dry-run
           else

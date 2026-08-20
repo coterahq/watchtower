@@ -1,6 +1,6 @@
 {
   "name": "@cotera/watchtower-command-palette",
-  "version": "0.1.0",
+  "version": "0.1.2",
   "description": "A headless command palette for WatchTower: the actions in scope and the resources your viewmodels expose, searched, grouped and keyboard-navigable",
   "type": "module",
   "license": "MIT",

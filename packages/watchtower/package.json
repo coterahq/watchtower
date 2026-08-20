@@ -1,6 +1,6 @@
 {
   "name": "@cotera/watchtower",
-  "version": "0.1.0",
+  "version": "0.1.2",
   "description": "Observable values for React: derivation, polling, event-driven refresh, optimistic writes",
   "type": "module",
   "license": "MIT",

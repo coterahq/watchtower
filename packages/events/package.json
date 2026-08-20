@@ -1,6 +1,6 @@
 {
   "name": "@cotera/watchtower-events",
-  "version": "0.1.0",
+  "version": "0.1.2",
   "description": "Event-driven watchables: a process-wide event bus and the watchables that refresh from it",
   "type": "module",
   "license": "MIT",

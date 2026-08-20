@@ -1,6 +1,6 @@
 {
   "name": "@cotera/watchtower-models",
-  "version": "0.1.0",
+  "version": "0.1.2",
   "description": "The WatchTower viewmodel layer: model scopes, lookup by type, and targeting",
   "type": "module",
   "license": "MIT",
